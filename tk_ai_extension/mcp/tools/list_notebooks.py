@@ -34,7 +34,12 @@ class ListNotebooksTool(BaseTool):
         notebooks: Optional[List[str]] = None,
         visited: Optional[set] = None,
     ) -> List[str]:
-        """Recursively list all notebooks in the file tree."""
+        """Recursively list all notebooks under ``path``.
+
+        Callers pass the contents manager's ``preferred_dir`` (the user-facing
+        notebooks dir) as the starting ``path``, so sibling trees under the
+        contents root (e.g. venvs) are outside the walk and never traversed.
+        """
         if notebooks is None:
             notebooks = []
         if visited is None:
@@ -72,7 +77,13 @@ class ListNotebooksTool(BaseTool):
         Returns:
             Formatted list of notebook paths
         """
-        all_notebooks = await self._list_notebooks_recursive(contents_manager)
+        # Anchor the walk at the contents manager's preferred_dir (the user-facing
+        # notebooks dir), not the server root. preferred_dir is an API path relative
+        # to root_dir; when unset it is "" and we fall back to walking from the root.
+        # This keeps the walk out of sibling trees (e.g. venvs) that live under the
+        # root but outside the notebooks dir.
+        start_dir = getattr(contents_manager, "preferred_dir", "") or ""
+        all_notebooks = await self._list_notebooks_recursive(contents_manager, path=start_dir)
 
         if not all_notebooks:
             return "No notebooks found in the current directory."
