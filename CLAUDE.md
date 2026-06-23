@@ -141,3 +141,5 @@ Extension settings in `schema/plugin.json`.
 - `jupyter-server-nbmodel` - Non-blocking execution via ExecutionStack
 - `@jupyterlab/*` 4.x - JupyterLab core packages
 - `marked` - Markdown rendering in chat
+
+@../../core/thinkube-metadata/plugins/tandem-methodology/methodology.md
