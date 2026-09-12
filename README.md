@@ -45,7 +45,7 @@ Paths are relative to the notebooks folder (`thinkube/notebooks`) or to the serv
 ## Install
 
 ```bash
-pip install https://github.com/thinkube/tk-notebook-mcp/releases/download/latest/tk_notebook_mcp-0.2.1-py3-none-any.whl
+pip install https://github.com/thinkube/tk-notebook-mcp/releases/download/latest/tk_notebook_mcp-0.2.2-py3-none-any.whl
 ```
 
 The wheel enables itself through `etc/jupyter/jupyter_server_config.d/tk_notebook_mcp.json`. It needs `jupyter-server-ydoc` (JupyterLab's collaboration server) on the same server.

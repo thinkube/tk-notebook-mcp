@@ -73,12 +73,12 @@ async def run_cell(ctx: Any, api_path: str, cell_index: int, kernel_id: str, cli
 
     # The cell clears as it starts, as it does when run from a tab, and its
     # outputs are written into the document as they arrive.
-    set_cell_outputs(ydoc, cell_index, None, [])
+    set_cell_outputs(ydoc, cell_index, None, [], running=True)
 
     async def progress(count: Optional[int], so_far: List[Dict[str, Any]]) -> None:
         live = await get_room_document(ctx.serverapp, api_path, create=False)
         if live is not None and cell_index < len(live.ycells):
-            set_cell_outputs(live, cell_index, count, so_far)
+            set_cell_outputs(live, cell_index, count, so_far, running=True)
 
     execution_count, outputs, failure = await run_code(ctx, kernel_id, client, source, timeout, on_progress=progress)
 

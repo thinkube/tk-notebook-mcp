@@ -16,7 +16,7 @@ from typing import Any, Dict, List, Optional
 from .base import CELL_INDEX, NOTEBOOK_PATH, BaseTool, error, ok
 from .outputs import summarize_outputs
 from .paths import display_path, resolve_notebook_path
-from .rooms import cell_source, get_room_document, read_cells
+from .rooms import cell_source, execution_states, get_room_document, read_cells
 
 POSITION = {
     "type": "string",
@@ -96,6 +96,7 @@ class ListCellsTool(BaseTool):
         if api_path is None:
             return error(f"notebook '{notebook_path}' not found", notebook_path=notebook_path)
         cells = await read_cells(ctx, api_path)
+        states = await execution_states(ctx, api_path)
         listed = []
         for index, cell in enumerate(cells):
             source = cell_source(cell)
@@ -108,6 +109,8 @@ class ListCellsTool(BaseTool):
             if cell.get("cell_type") == "code":
                 entry["execution_count"] = cell.get("execution_count")
                 entry["has_error"] = any(o.get("output_type") == "error" for o in cell.get("outputs", []) or [])
+                if index in states:
+                    entry["execution_state"] = states[index]
             listed.append(entry)
         return ok(notebook_path=display_path(ctx, api_path), cells=listed, count=len(listed))
 

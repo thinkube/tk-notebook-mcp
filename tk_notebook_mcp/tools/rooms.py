@@ -13,7 +13,7 @@ all, and a tab that opens later joins the same document.
 from __future__ import annotations
 
 import asyncio
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 from jupyter_core.utils import ensure_async
 
@@ -76,6 +76,19 @@ def cells_of_document(ydoc: Any) -> List[dict]:
     return [ydoc.get_cell(i) for i in range(len(ydoc.ycells))]
 
 
+async def execution_states(ctx: Any, api_path: str) -> Dict[int, str]:
+    """The live execution state of each code cell, from the room; empty when no room exists."""
+    ydoc = await get_room_document(ctx.serverapp, api_path, create=False)
+    if ydoc is None:
+        return {}
+    states: Dict[int, str] = {}
+    for index in range(len(ydoc.ycells)):
+        state = ydoc.ycells[index].get("execution_state")
+        if state:
+            states[index] = str(state)
+    return states
+
+
 async def read_cells(ctx: Any, api_path: str) -> List[dict]:
     """The notebook's cells: from the room when one exists, otherwise from the file."""
     ydoc = await get_room_document(ctx.serverapp, api_path, create=False)
@@ -85,11 +98,18 @@ async def read_cells(ctx: Any, api_path: str) -> List[dict]:
     return list(model.get("content", {}).get("cells", []))
 
 
-def set_cell_outputs(ydoc: Any, cell_index: int, execution_count: Optional[int], outputs: List[dict]) -> None:
-    """Replace a cell's outputs and count in one transaction, so tabs see one change."""
+def set_cell_outputs(
+    ydoc: Any, cell_index: int, execution_count: Optional[int], outputs: List[dict], running: bool = False
+) -> None:
+    """Replace a cell's outputs and count in one transaction, so tabs see one change.
+
+    ``running`` sets the cell's live execution state, which a tab draws as
+    ``[*]``; the state is not part of the saved file.
+    """
     cell = ydoc.ycells[cell_index]
     with cell.doc.transaction():
         cell["execution_count"] = execution_count
+        cell["execution_state"] = "running" if running else "idle"
         del cell["outputs"][:]
         for output in outputs:
             cell["outputs"].append(output)
