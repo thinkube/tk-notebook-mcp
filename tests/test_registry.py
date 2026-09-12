@@ -80,3 +80,15 @@ async def test_unknown_tool_raises_key_error():
     registry = ToolRegistry(make_context())
     with pytest.raises(KeyError):
         await registry.call("missing", {})
+
+
+def test_consecutive_stream_text_becomes_one_output():
+    from tk_notebook_mcp.tools.kernels import append_output
+
+    outputs = []
+    append_output(outputs, {"output_type": "stream", "name": "stdout", "text": "a"})
+    append_output(outputs, {"output_type": "stream", "name": "stdout", "text": "\rb"})
+    append_output(outputs, {"output_type": "stream", "name": "stderr", "text": "c"})
+    append_output(outputs, {"output_type": "execute_result", "data": {"text/plain": "1"}, "metadata": {}, "execution_count": 1})
+    append_output(outputs, {"output_type": "stream", "name": "stdout", "text": "d"})
+    assert [o.get("text", o["output_type"]) for o in outputs] == ["a\rb", "c", "execute_result", "d"]

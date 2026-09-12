@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "tk_notebook_mcp"
-version = "0.2.0"
+version = "0.2.1"
 description = "Notebook operations for Claude Code, served by the Jupyter server inside Thinkube Notebooks"
 readme = "README.md"
 license = { file = "LICENSE" }

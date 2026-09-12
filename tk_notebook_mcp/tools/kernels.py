@@ -155,12 +155,31 @@ async def kernel_client(ctx: Any, kernel_id: str, ready_seconds: float = READY_S
         client.stop_channels()
 
 
+ProgressCallback = Callable[[Optional[int], List[Dict[str, Any]]], Awaitable[None]]
+
+PROGRESS_INTERVAL = 0.25
+
+
+def append_output(outputs: List[Dict[str, Any]], output: Dict[str, Any]) -> None:
+    """Add an output the way a notebook stores it: consecutive stream text of one name is one output."""
+    if (
+        output.get("output_type") == "stream"
+        and outputs
+        and outputs[-1].get("output_type") == "stream"
+        and outputs[-1].get("name") == output.get("name")
+    ):
+        outputs[-1] = {**outputs[-1], "text": outputs[-1].get("text", "") + output.get("text", "")}
+        return
+    outputs.append(output)
+
+
 async def run_code(
     ctx: Any,
     kernel_id: str,
     client: Any,
     code: str,
     timeout_seconds: float,
+    on_progress: Optional[ProgressCallback] = None,
 ) -> Tuple[Optional[int], List[Dict[str, Any]], Optional[str]]:
     """Run ``code`` and collect its outputs.
 
@@ -168,6 +187,10 @@ async def run_code(
     the kernel replied in time, otherwise a sentence saying what happened:
     the run passed its timeout and the kernel was interrupted, or the kernel
     was restarted underneath it.
+
+    ``on_progress`` is called with the outputs so far whenever they changed,
+    at most a few times a second, so a tab watching the notebook sees a
+    progress bar advance and prints appear as they happen.
     """
     import zmq
     import zmq.asyncio
@@ -192,6 +215,8 @@ async def run_code(
     grace = 0.1
     loop = asyncio.get_event_loop()
     started = loop.time()
+    changed = False
+    last_progress = started
 
     async def take(channel: Any) -> Optional[dict]:
         msg = channel.get_msg(timeout=0)
@@ -201,6 +226,13 @@ async def run_code(
 
     while True:
         now = loop.time()
+        if changed and on_progress is not None and now - last_progress >= PROGRESS_INTERVAL:
+            changed = False
+            last_progress = now
+            try:
+                await on_progress(execution_count, list(outputs))
+            except Exception as e:
+                ctx.log.warning("tk-notebook-mcp: progress write failed: %s", e)
         if replied and replied_at is not None and now - replied_at >= grace:
             break
         if _generation.get(kernel_id, 0) != generation:
@@ -228,11 +260,14 @@ async def run_code(
                 kind = msg.get("msg_type")
                 content = msg.get("content", {})
                 if kind == "stream":
-                    outputs.append(
-                        {"output_type": "stream", "name": content.get("name", "stdout"), "text": content.get("text", "")}
+                    append_output(
+                        outputs,
+                        {"output_type": "stream", "name": content.get("name", "stdout"), "text": content.get("text", "")},
                     )
+                    changed = True
                 elif kind == "execute_result":
                     execution_count = content.get("execution_count", execution_count)
+                    changed = True
                     outputs.append(
                         {
                             "output_type": "execute_result",
@@ -242,10 +277,12 @@ async def run_code(
                         }
                     )
                 elif kind == "display_data":
+                    changed = True
                     outputs.append(
                         {"output_type": "display_data", "data": content.get("data", {}), "metadata": content.get("metadata", {})}
                     )
                 elif kind == "error":
+                    changed = True
                     outputs.append(
                         {
                             "output_type": "error",
@@ -256,6 +293,7 @@ async def run_code(
                     )
                 elif kind == "clear_output":
                     outputs.clear()
+                    changed = True
 
         if shell in events:
             reply = await take(client.shell_channel)
