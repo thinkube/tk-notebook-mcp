@@ -1,213 +1,83 @@
 # Copyright 2025 Alejandro Martínez Corriá and the Thinkube contributors
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Integration tests for HTTP handlers."""
+"""The three HTTP endpoints, served by a bare tornado application."""
 
-import pytest
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
+import logging
+from types import SimpleNamespace
+
+from jupyter_server.auth.identity import IdentityProvider, User
 from tornado.testing import AsyncHTTPTestCase
 from tornado.web import Application
-from tk_ai_extension.handlers import MCPHealthHandler, MCPToolsListHandler, MCPToolCallHandler
+
+from tk_notebook_mcp.handlers import HealthHandler, ToolCallHandler, ToolsListHandler
+from tk_notebook_mcp.registry import ToolContext, ToolRegistry
+from tk_notebook_mcp.tools.base import BaseTool, ok
 
 
-class TestMCPHealthHandler(AsyncHTTPTestCase):
-    """Tests for MCPHealthHandler."""
+class FixedIdentity(IdentityProvider):
+    """Every request is the same signed-in user."""
 
+    async def get_user(self, handler):
+        return User("tester")
+
+
+class Ping(BaseTool):
+    name = "ping"
+    description = "answers"
+    input_schema = {"type": "object", "properties": {}, "required": []}
+
+    async def execute(self, ctx, **kwargs):
+        if kwargs.get("boom"):
+            raise RuntimeError("boom")
+        return ok(pong=True)
+
+
+def make_registry():
+    serverapp = SimpleNamespace(log=logging.getLogger("test"), root_dir="/", base_url="/", contents_manager=SimpleNamespace())
+    registry = ToolRegistry(ToolContext(serverapp))
+    registry.register(Ping())
+    return registry
+
+
+class HandlerTests(AsyncHTTPTestCase):
     def get_app(self):
-        """Create test application."""
-        return Application([
-            (r"/api/tk-ai/mcp/health", MCPHealthHandler),
-        ])
+        return Application(
+            [
+                (r"/api/tk-notebook/mcp/health", HealthHandler),
+                (r"/api/tk-notebook/mcp/tools/list", ToolsListHandler),
+                (r"/api/tk-notebook/mcp/tools/call", ToolCallHandler),
+            ],
+            tk_notebook_mcp_registry=make_registry(),
+            identity_provider=FixedIdentity(),
+            cookie_secret=b"test",
+            disable_check_xsrf=True,
+        )
 
-    def test_health_check(self):
-        """Test health check endpoint."""
-        response = self.fetch('/api/tk-ai/mcp/health')
-
+    def test_health(self):
+        response = self.fetch("/api/tk-notebook/mcp/health")
         assert response.code == 200
-        data = json.loads(response.body)
-        assert data['status'] == 'ok'
-        assert data['service'] == 'tk-ai-extension'
-        assert 'version' in data
+        body = json.loads(response.body)
+        assert body["service"] == "tk-notebook-mcp" and body["tools"] == 1
 
+    def test_list(self):
+        body = json.loads(self.fetch("/api/tk-notebook/mcp/tools/list").body)
+        assert body["tools"][0]["name"] == "ping"
 
-class TestMCPToolsListHandler(AsyncHTTPTestCase):
-    """Tests for MCPToolsListHandler."""
-
-    def get_app(self):
-        """Create test application."""
-        return Application([
-            (r"/api/tk-ai/mcp/tools/list", MCPToolsListHandler),
-        ])
-
-    @patch('tk_ai_extension.handlers.get_registered_tools')
-    def test_list_tools(self, mock_get_tools):
-        """Test listing available tools."""
-        # Mock registered tools
-        mock_tool = MagicMock()
-        mock_tool.name = 'test_tool'
-        mock_tool.description = 'A test tool'
-        mock_tool.input_schema = {
-            'type': 'object',
-            'properties': {'param': {'type': 'string'}}
-        }
-
-        mock_get_tools.return_value = {
-            'test_tool': {'instance': mock_tool}
-        }
-
-        response = self.fetch('/api/tk-ai/mcp/tools/list')
-
+    def test_call(self):
+        response = self.fetch(
+            "/api/tk-notebook/mcp/tools/call", method="POST", body=json.dumps({"tool": "ping", "arguments": {}})
+        )
         assert response.code == 200
-        data = json.loads(response.body)
-        assert 'tools' in data
-        assert len(data['tools']) == 1
-        assert data['tools'][0]['name'] == 'test_tool'
-        assert data['tools'][0]['description'] == 'A test tool'
-        assert 'inputSchema' in data['tools'][0]
+        assert json.loads(response.body) == {"success": True, "pong": True}
 
-
-class TestMCPToolCallHandler(AsyncHTTPTestCase):
-    """Tests for MCPToolCallHandler."""
-
-    def get_app(self):
-        """Create test application."""
-        return Application([
-            (r"/api/tk-ai/mcp/tools/call", MCPToolCallHandler),
-        ])
-
-    @patch('tk_ai_extension.handlers.get_registered_tools')
-    def test_call_tool_success(self, mock_get_tools):
-        """Test successful tool execution."""
-        # Mock tool executor
-        async def mock_executor(args):
-            return {
-                'content': [{'type': 'text', 'text': 'Tool executed successfully'}]
-            }
-
-        mock_get_tools.return_value = {
-            'test_tool': {'executor': mock_executor}
-        }
-
-        body = json.dumps({
-            'tool': 'test_tool',
-            'arguments': {'param': 'value'}
-        })
-
+    def test_call_errors(self):
+        assert self.fetch("/api/tk-notebook/mcp/tools/call", method="POST", body="not json").code == 400
+        assert self.fetch("/api/tk-notebook/mcp/tools/call", method="POST", body=json.dumps({})).code == 400
+        assert self.fetch("/api/tk-notebook/mcp/tools/call", method="POST", body=json.dumps({"tool": "none"})).code == 404
         response = self.fetch(
-            '/api/tk-ai/mcp/tools/call',
-            method='POST',
-            body=body
+            "/api/tk-notebook/mcp/tools/call", method="POST", body=json.dumps({"tool": "ping", "arguments": {"boom": 1}})
         )
-
-        assert response.code == 200
-        data = json.loads(response.body)
-        assert 'content' in data
-        assert data['content'][0]['text'] == 'Tool executed successfully'
-
-    @patch('tk_ai_extension.handlers.get_registered_tools')
-    def test_call_tool_not_found(self, mock_get_tools):
-        """Test calling non-existent tool."""
-        mock_get_tools.return_value = {}
-
-        body = json.dumps({
-            'tool': 'nonexistent_tool',
-            'arguments': {}
-        })
-
-        response = self.fetch(
-            '/api/tk-ai/mcp/tools/call',
-            method='POST',
-            body=body
-        )
-
-        assert response.code == 404
-        data = json.loads(response.body)
-        assert 'error' in data
-        assert 'not found' in data['error'].lower()
-
-    def test_call_tool_missing_parameter(self):
-        """Test calling tool without required tool parameter."""
-        body = json.dumps({
-            'arguments': {}
-        })
-
-        response = self.fetch(
-            '/api/tk-ai/mcp/tools/call',
-            method='POST',
-            body=body
-        )
-
-        assert response.code == 400
-        data = json.loads(response.body)
-        assert 'error' in data
-        assert 'required' in data['error'].lower()
-
-    def test_call_tool_invalid_json(self):
-        """Test calling tool with invalid JSON."""
-        response = self.fetch(
-            '/api/tk-ai/mcp/tools/call',
-            method='POST',
-            body='invalid json'
-        )
-
-        assert response.code == 400
-        data = json.loads(response.body)
-        assert 'error' in data
-        assert 'json' in data['error'].lower()
-
-
-class TestToolsRegistry:
-    """Tests for tools registry integration."""
-
-    @patch('tk_ai_extension.agent.tools_registry._jupyter_managers', {
-        'contents_manager': AsyncMock(),
-        'kernel_manager': MagicMock(),
-        'kernel_spec_manager': MagicMock()
-    })
-    def test_register_and_get_tools(self):
-        """Test registering and retrieving tools."""
-        from tk_ai_extension.agent.tools_registry import register_tool, get_registered_tools
-        from tk_ai_extension.mcp.tools.list_notebooks import ListNotebooksTool
-
-        # Register tool
-        tool = ListNotebooksTool()
-        register_tool(tool)
-
-        # Retrieve tools
-        tools = get_registered_tools()
-
-        assert 'list_notebooks' in tools
-        assert 'instance' in tools['list_notebooks']
-        assert 'executor' in tools['list_notebooks']
-        assert tools['list_notebooks']['instance'].name == 'list_notebooks'
-
-    @pytest.mark.asyncio
-    @patch('tk_ai_extension.agent.tools_registry._jupyter_managers', {
-        'contents_manager': AsyncMock(),
-        'kernel_manager': MagicMock(),
-        'kernel_spec_manager': MagicMock()
-    })
-    async def test_tool_executor_wrapping(self):
-        """Test that tool executors are properly wrapped."""
-        from tk_ai_extension.agent.tools_registry import register_tool, get_registered_tools
-        from tk_ai_extension.mcp.tools.list_kernels import ListKernelsTool
-
-        # Mock kernel manager
-        from tk_ai_extension.agent import tools_registry
-        tools_registry._jupyter_managers['kernel_manager'].list_kernels.return_value = []
-
-        # Register tool
-        tool = ListKernelsTool()
-        register_tool(tool)
-
-        # Get executor
-        tools = get_registered_tools()
-        executor = tools['list_kernels']['executor']
-
-        # Execute
-        result = await executor({})
-
-        assert 'content' in result
-        assert isinstance(result['content'], list)
-        assert result['content'][0]['type'] == 'text'
+        assert response.code == 500
+        assert "boom" in json.loads(response.body)["error"]

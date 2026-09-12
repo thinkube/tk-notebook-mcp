@@ -1,100 +1,50 @@
 [build-system]
-requires = ["hatchling>=1.5.0", "jupyterlab>=4.0.0,<5", "hatch-nodejs-version>=0.3.2"]
+requires = ["hatchling>=1.5.0"]
 build-backend = "hatchling.build"
 
 [project]
-name = "tk_ai_extension"
+name = "tk_notebook_mcp"
+version = "0.2.0"
+description = "Notebook operations for Claude Code, served by the Jupyter server inside Thinkube Notebooks"
 readme = "README.md"
 license = { file = "LICENSE" }
-requires-python = ">=3.9"
+requires-python = ">=3.10"
+authors = [{ name = "Alejandro Martínez Corriá and the Thinkube contributors", email = "info@thinkube.com" }]
+keywords = ["jupyter", "jupyter-server", "mcp", "thinkube"]
 classifiers = [
     "Framework :: Jupyter",
-    "Framework :: Jupyter :: JupyterLab",
     "Framework :: Jupyter :: JupyterLab :: 4",
-    "Framework :: Jupyter :: JupyterLab :: Extensions",
-    "Framework :: Jupyter :: JupyterLab :: Extensions :: Prebuilt",
     "License :: OSI Approved :: BSD License",
-    "Programming Language :: Python",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
-    "jupyter-server>=2.0.0",
-    "claude-agent-sdk",
-    "ipython>=8.0.0",
+    "jupyter-server>=2.14,<3",
+    "jupyter-server-ydoc>=2.4,<3",
+    "jupyter-ydoc>=3.0,<4",
+    "pycrdt>=0.12,<1",
+    "nbformat>=5.9",
+    "pyzmq>=25",
 ]
-dynamic = ["version", "description", "authors", "urls", "keywords"]
+
+[project.urls]
+Homepage = "https://github.com/thinkube/tk-notebook-mcp"
+Issues = "https://github.com/thinkube/tk-notebook-mcp/issues"
 
 [project.optional-dependencies]
-test = [
-    "pytest>=7.0.0",
-    "pytest-asyncio>=0.21.0",
-    "pytest-tornasync>=0.6.0",
-    "pytest-cov>=4.0.0",
-]
-dev = [
-    "pytest>=7.0.0",
-    "pytest-asyncio>=0.21.0",
-    "pytest-tornasync>=0.6.0",
-    "pytest-cov>=4.0.0",
-    "black>=23.0.0",
-    "ruff>=0.1.0",
-]
+test = ["pytest>=7.0.0", "pytest-asyncio>=0.21.0"]
 
 [project.entry-points."jupyter_server.extension_points"]
-tk_ai_extension = "tk_ai_extension"
+tk_notebook_mcp = "tk_notebook_mcp"
 
-[tool.hatch.version]
-source = "nodejs"
-
-[tool.hatch.metadata.hooks.nodejs]
-fields = ["description", "authors", "urls", "keywords"]
-
-[tool.hatch.build.targets.sdist]
-artifacts = ["tk_ai_extension/labextension"]
-exclude = [".github", "binder"]
+[tool.hatch.build.targets.wheel]
+packages = ["tk_notebook_mcp"]
 
 [tool.hatch.build.targets.wheel.shared-data]
-"tk_ai_extension/labextension" = "share/jupyter/labextensions/tk-ai-extension"
-"install.json" = "share/jupyter/labextensions/tk-ai-extension/install.json"
-"jupyter-config/jupyter_server_config.d/tk_ai_extension.json" = "etc/jupyter/jupyter_server_config.d/tk_ai_extension.json"
+"jupyter-config/jupyter_server_config.d/tk_notebook_mcp.json" = "etc/jupyter/jupyter_server_config.d/tk_notebook_mcp.json"
 
-[tool.hatch.build.hooks.version]
-path = "tk_ai_extension/_version.py"
+[tool.hatch.build.targets.sdist]
+exclude = [".github"]
 
-[tool.hatch.build.hooks.jupyter-builder]
-dependencies = ["hatch-jupyter-builder>=0.5"]
-build-function = "hatch_jupyter_builder.npm_builder"
-ensured-targets = [
-    "tk_ai_extension/labextension/static/style.js",
-    "tk_ai_extension/labextension/package.json",
-]
-skip-if-exists = ["tk_ai_extension/labextension/static/style.js"]
-
-[tool.hatch.build.hooks.jupyter-builder.build-kwargs]
-build_cmd = "build:prod"
-npm = ["jlpm"]
-
-[tool.hatch.build.hooks.jupyter-builder.editable-build-kwargs]
-build_cmd = "install:extension"
-npm = ["jlpm"]
-source_dir = "src"
-build_dir = "tk_ai_extension/labextension"
-
-[tool.jupyter-releaser.options]
-version_cmd = "hatch version"
-
-[tool.jupyter-releaser.hooks]
-before-build-npm = [
-    "python -m pip install 'jupyterlab>=4.0.0,<5'",
-    "jlpm",
-    "jlpm build:prod"
-]
-before-build-python = ["jlpm clean:all"]
-
-[tool.check-wheel-contents]
-ignore = ["W002"]
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

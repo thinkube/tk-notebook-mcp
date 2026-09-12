@@ -1,9 +1,0 @@
-{
-  "mcpServers": {
-    "tk-ai-lab": {
-      "type": "http",
-      "url": "http://localhost:8888/api/tk-ai/mcp/",
-      "description": "tk-ai lab notebook tools"
-    }
-  }
-}

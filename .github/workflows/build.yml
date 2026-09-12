@@ -14,87 +14,59 @@ jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: write  # Required for creating releases
+      contents: write
 
     steps:
     - name: Checkout
       uses: actions/checkout@v4
 
-    - name: Base Setup
-      uses: jupyterlab/maintainer-tools/.github/actions/base-setup@v1
+    - name: Install Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
 
-    - name: Install dependencies
-      run: python -m pip install -U "jupyterlab>=4.0.0,<5"
-
-    - name: Build the extension
+    - name: Test
       run: |
         set -eux
-        jlpm
-        jlpm run build
-        python -m pip install .[test]
+        python -m pip install -U pip build
+        python -m pip install ".[test]"
+        python -m pytest -q
 
-        jupyter labextension list
-        jupyter labextension list 2>&1 | grep -ie "tk-ai-extension.*OK"
-
-    - name: Package the extension
+    - name: Package
       run: |
         set -eux
-
-        pip install build
         python -m build
-        pip uninstall -y "tk_ai_extension" jupyterlab
+        ls -l dist
 
-    - name: Upload extension packages
+    - name: Check the wheel installs as a server extension
+      run: |
+        set -eux
+        python -m pip install --force-reinstall dist/tk_notebook_mcp-*.whl
+        jupyter server extension list 2>&1 | grep -i "tk_notebook_mcp.*OK"
+
+    - name: Upload the packages
       uses: actions/upload-artifact@v4
       with:
         name: extension-artifacts
-        path: dist/tk_ai_extension*
+        path: dist/tk_notebook_mcp*
         if-no-files-found: error
 
-    # Publish wheel to GitHub Release on main branch pushes
-    - name: Create/Update Latest Release
+    - name: Publish the wheel on the latest release
       if: github.ref == 'refs/heads/main' && github.event_name == 'push'
       uses: softprops/action-gh-release@v2
       with:
         tag_name: latest
         name: Latest Build
         body: |
-          Automated build from main branch.
+          Automated build from main.
 
           **Commit:** ${{ github.sha }}
           **Date:** ${{ github.event.head_commit.timestamp }}
 
           Install with:
           ```bash
-          pip install https://github.com/thinkube/tk-ai-extension/releases/download/latest/tk_ai_extension-0.1.0-py3-none-any.whl
+          pip install https://github.com/thinkube/tk-notebook-mcp/releases/download/latest/tk_notebook_mcp-0.2.0-py3-none-any.whl
           ```
-        files: dist/tk_ai_extension*.whl
+        files: dist/tk_notebook_mcp*.whl
         prerelease: true
         make_latest: true
-
-  test_isolated:
-    needs: build
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Install Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.12'
-        architecture: 'x64'
-    - uses: actions/download-artifact@v4
-      with:
-        name: extension-artifacts
-    - name: Install and Test
-      run: |
-        set -eux
-        # Remove NodeJS, twice to take care of system and locally installed node versions.
-        sudo rm -rf $(which node)
-        sudo rm -rf $(which node)
-
-        pip install "jupyterlab>=4.0.0,<5" tk_ai_extension*.whl
-
-
-        jupyter labextension list
-        jupyter labextension list 2>&1 | grep -ie "tk-ai-extension.*OK"
-        python -m jupyterlab.browser_check --no-browser-test
