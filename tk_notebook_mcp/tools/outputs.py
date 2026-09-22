@@ -1,4 +1,4 @@
-# Copyright 2025 Alejandro Martínez Corriá and the Thinkube contributors
+# Copyright Alejandro Martínez Corriá and the Thinkube contributors
 # SPDX-License-Identifier: BSD-3-Clause
 
 """Large cell outputs are written beside the notebooks and replaced by a path in the reply.

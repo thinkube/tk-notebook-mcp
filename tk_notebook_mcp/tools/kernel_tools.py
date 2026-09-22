@@ -1,4 +1,4 @@
-# Copyright 2025 Alejandro Martínez Corriá and the Thinkube contributors
+# Copyright Alejandro Martínez Corriá and the Thinkube contributors
 # SPDX-License-Identifier: BSD-3-Clause
 
 """Kernel tools: restart, interrupt, status, the list, and a package check inside the kernel."""

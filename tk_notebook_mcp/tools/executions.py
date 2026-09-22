@@ -1,4 +1,4 @@
-# Copyright 2025 Alejandro Martínez Corriá and the Thinkube contributors
+# Copyright Alejandro Martínez Corriá and the Thinkube contributors
 # SPDX-License-Identifier: BSD-3-Clause
 
 """Records of background executions, kept in memory and mirrored to disk.
