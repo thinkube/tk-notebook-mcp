@@ -13,7 +13,7 @@ Every change goes through the notebook's shared document (jupyter_server_ydoc), 
 
 ## How it reaches a user
 
-It is built into the Thinkube notebook image. The image `tk-jupyter-base` (`core/harbor-images/base-images/tk-jupyter-base.Containerfile.j2` in [thinkube](https://github.com/thinkube/thinkube)) installs the wheel from this repository's `latest` GitHub release, so every notebook server runs the extension. The Thinkube installer builds that image. thinkube-control calls the endpoints below on the user's notebook server (`backend/app/api/jupyter_notebooks.py` in thinkube-control) and offers them to Claude Code as MCP tools. The extension is not installed on its own.
+It is built into the Thinkube notebook image. The image `tk-jupyter-base` (`core/harbor-images/base-images/tk-jupyter-base.Containerfile.j2` in [thinkube](https://github.com/thinkube/thinkube)) installs the wheel from this repository's `wheel-<branch>` GitHub release, for the branch the platform is installed from, so every notebook server runs the extension. The Thinkube installer builds that image. thinkube-control calls the endpoints below on the user's notebook server (`backend/app/api/jupyter_notebooks.py` in thinkube-control) and offers them to Claude Code as MCP tools. The extension is not installed on its own.
 
 The wheel enables itself through `etc/jupyter/jupyter_server_config.d/tk_notebook_mcp.json`. It needs `jupyter-server-ydoc` (JupyterLab's collaboration server) on the same server.
 
@@ -58,7 +58,7 @@ pytest
 python -m build
 ```
 
-A push to `main` builds the wheel and publishes it on the `latest` GitHub release (`.github/workflows/build.yml`). The notebook image installs the wheel by its versioned file name, so a version change in `pyproject.toml` also needs the file name in `tk-jupyter-base.Containerfile.j2` changed.
+A push to `main` or to a `release-*` branch builds the wheel and publishes it on that branch's GitHub release, `wheel-<branch>` (`.github/workflows/build.yml`). The notebook image installs the wheel by its versioned file name, so a version change in `pyproject.toml` also needs the file name in `tk-jupyter-base.Containerfile.j2` changed.
 
 ## License
 

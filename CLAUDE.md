@@ -4,7 +4,7 @@ Guidance for Claude Code when working in this repository.
 
 ## What this is
 
-`tk-notebook-mcp` is a Jupyter **server** extension. It has no frontend. It serves notebook tools over three HTTP endpoints under `/api/tk-notebook/mcp`, and thinkube-control forwards them to Claude Code as MCP operations. The wheel is installed into the `tk-jupyter-base` image from this repository's `latest` GitHub release.
+`tk-notebook-mcp` is a Jupyter **server** extension. It has no frontend. It serves notebook tools over three HTTP endpoints under `/api/tk-notebook/mcp`, and thinkube-control forwards them to Claude Code as MCP operations. The wheel is installed into the `tk-jupyter-base` image from this repository's `wheel-<branch>` GitHub release, for the branch the platform is installed from.
 
 ## Layout
 
@@ -47,4 +47,4 @@ To try a build on the cluster without rebuilding the image, copy the wheel into 
 
 ## Release
 
-Pushing to `main` runs the Build workflow, which tests, builds the wheel and publishes it on the `latest` release. Bump `version` in `pyproject.toml` and `tk_notebook_mcp/_version.py` together, and the wheel file name in `tk-jupyter-base.Containerfile.j2` in the `thinkube` repository.
+Pushing to `main` or to a `release-*` branch runs the Build workflow, which tests, builds the wheel and publishes it on that branch's release, `wheel-<branch>`. Bump `version` in `pyproject.toml` and `tk_notebook_mcp/_version.py` together, and the wheel file name in `tk-jupyter-base.Containerfile.j2` in the `thinkube` repository.

@@ -5,7 +5,9 @@ name: Build
 
 on:
   push:
-    branches: main
+    branches:
+      - main
+      - 'release-*'
   pull_request:
     branches: '*'
 
@@ -54,22 +56,21 @@ jobs:
         path: dist/tk_notebook_mcp*
         if-no-files-found: error
 
-    - name: Publish the wheel on the latest release
-      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    # Each branch publishes its wheel on its own release, wheel-<branch>. The
+    # Thinkube notebook image downloads the wheel from wheel-<the branch the
+    # platform is installed from>.
+    - name: Publish the wheel on the branch's release
+      if: github.event_name == 'push'
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: latest
-        name: Latest Build
+        tag_name: wheel-${{ github.ref_name }}
+        target_commitish: ${{ github.sha }}
+        name: Wheel from ${{ github.ref_name }}
         body: |
-          Automated build from main.
+          Automated build from the ${{ github.ref_name }} branch.
 
           **Commit:** ${{ github.sha }}
           **Date:** ${{ github.event.head_commit.timestamp }}
-
-          Install with:
-          ```bash
-          pip install https://github.com/thinkube/tk-notebook-mcp/releases/download/latest/tk_notebook_mcp-0.2.2-py3-none-any.whl
-          ```
         files: dist/tk_notebook_mcp*.whl
         prerelease: true
-        make_latest: true
+        make_latest: false
