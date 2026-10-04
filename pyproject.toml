@@ -1,0 +1,53 @@
+# Copyright Alejandro Martínez Corriá and the Thinkube contributors
+# SPDX-License-Identifier: BSD-3-Clause
+
+[build-system]
+requires = ["hatchling>=1.5.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "tk_notebook_mcp"
+version = "0.1.0"
+description = "Notebook operations for Claude Code, served by the Jupyter server inside Thinkube Notebooks"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+authors = [{ name = "Alejandro Martínez Corriá and the Thinkube contributors", email = "info@thinkube.com" }]
+keywords = ["jupyter", "jupyter-server", "mcp", "thinkube"]
+classifiers = [
+    "Framework :: Jupyter",
+    "Framework :: Jupyter :: JupyterLab :: 4",
+    "License :: OSI Approved :: BSD License",
+    "Programming Language :: Python :: 3",
+]
+dependencies = [
+    "jupyter-server>=2.14,<3",
+    "jupyter-server-ydoc>=2.4,<3",
+    "jupyter-ydoc>=3.0,<4",
+    "pycrdt>=0.12,<1",
+    "nbformat>=5.9",
+    "pyzmq>=25",
+]
+
+[project.urls]
+Homepage = "https://github.com/thinkube/tk-notebook-mcp"
+Issues = "https://github.com/thinkube/tk-notebook-mcp/issues"
+
+[project.optional-dependencies]
+test = ["pytest>=7.0.0", "pytest-asyncio>=0.21.0"]
+
+[project.entry-points."jupyter_server.extension_points"]
+tk_notebook_mcp = "tk_notebook_mcp"
+
+[tool.hatch.build.targets.wheel]
+packages = ["tk_notebook_mcp"]
+
+[tool.hatch.build.targets.wheel.shared-data]
+"jupyter-config/jupyter_server_config.d/tk_notebook_mcp.json" = "etc/jupyter/jupyter_server_config.d/tk_notebook_mcp.json"
+
+[tool.hatch.build.targets.sdist]
+exclude = [".github"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

@@ -1,0 +1,7 @@
+{
+  "ServerApp": {
+    "jpserver_extensions": {
+      "tk_notebook_mcp": true
+    }
+  }
+}

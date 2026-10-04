@@ -1,0 +1,76 @@
+# Copyright Alejandro Martínez Corriá and the Thinkube contributors
+# SPDX-License-Identifier: BSD-3-Clause
+
+name: Build
+
+on:
+  push:
+    branches:
+      - main
+      - 'release-*'
+  pull_request:
+    branches: '*'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Install Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Test
+      run: |
+        set -eux
+        python -m pip install -U pip build
+        python -m pip install ".[test]"
+        python -m pytest -q
+
+    - name: Package
+      run: |
+        set -eux
+        python -m build
+        ls -l dist
+
+    - name: Check the wheel installs as a server extension
+      run: |
+        set -eux
+        python -m pip install --force-reinstall dist/tk_notebook_mcp-*.whl
+        jupyter server extension list 2>&1 | grep -i "tk_notebook_mcp.*OK"
+
+    - name: Upload the packages
+      uses: actions/upload-artifact@v4
+      with:
+        name: extension-artifacts
+        path: dist/tk_notebook_mcp*
+        if-no-files-found: error
+
+    # Each branch publishes its wheel on its own release, wheel-<branch>. The
+    # Thinkube notebook image downloads the wheel from wheel-<the branch the
+    # platform is installed from>.
+    - name: Publish the wheel on the branch's release
+      if: github.event_name == 'push'
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: wheel-${{ github.ref_name }}
+        target_commitish: ${{ github.sha }}
+        name: Wheel from ${{ github.ref_name }}
+        body: |
+          Automated build from the ${{ github.ref_name }} branch.
+
+          **Commit:** ${{ github.sha }}
+          **Date:** ${{ github.event.head_commit.timestamp }}
+        files: dist/tk_notebook_mcp*.whl
+        prerelease: true
+        make_latest: false
