@@ -98,16 +98,24 @@ async def read_cells(ctx: Any, api_path: str) -> List[dict]:
     return list(model.get("content", {}).get("cells", []))
 
 
+# The origin of the transactions that write a run's outputs. The document's
+# undo manager tracks the transactions without an origin and keeps what they
+# deleted; a running cell's outputs are replaced a few times a second, so
+# tracked, every replaced copy of a growing output would stay in memory.
+OUTPUTS_ORIGIN = "tk-notebook-mcp:outputs"
+
+
 def set_cell_outputs(
     ydoc: Any, cell_index: int, execution_count: Optional[int], outputs: List[dict], running: bool = False
 ) -> None:
     """Replace a cell's outputs and count in one transaction, so tabs see one change.
 
     ``running`` sets the cell's live execution state, which a tab draws as
-    ``[*]``; the state is not part of the saved file.
+    ``[*]``; the state is not part of the saved file. The transaction carries
+    OUTPUTS_ORIGIN, which keeps it out of the document's undo history.
     """
     cell = ydoc.ycells[cell_index]
-    with cell.doc.transaction():
+    with cell.doc.transaction(origin=OUTPUTS_ORIGIN):
         cell["execution_count"] = execution_count
         cell["execution_state"] = "running" if running else "idle"
         del cell["outputs"][:]
